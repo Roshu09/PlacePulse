@@ -1,0 +1,124 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/instrument-sans";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Design tokens ------------------------------------------------------------------
+   Bottle green is the brand, marigold is the signal (actions + the live pulse).
+   Neutrals are tinted green so nothing looks like default grey.
+--------------------------------------------------------------------------------------- */
+:root {
+  --paper: #f2f4f0;
+  --surface: #ffffff;
+  --sunken: #e7ebe4;
+  --ink: #12231e;
+  --ink-soft: #52645c;
+  --line: #d3dbd1;
+
+  --rail: #0e3b32;
+  --rail-ink: #e6efe9;
+
+  --signal: #f4b223;
+  --signal-strong: #e0a010;
+  --on-signal: #0e3b32;
+
+  --good: #14795c;
+  --bad: #b3402a;
+  --focus: #0e3b32;
+}
+
+.dark {
+  --paper: #0b1512;
+  --surface: #122019;
+  --sunken: #0e1a15;
+  --ink: #e7efe9;
+  --ink-soft: #9db1a7;
+  --line: #233630;
+
+  --rail: #0c2e27;
+  --rail-ink: #e6efe9;
+
+  --good: #4cc9a0;
+  --bad: #ef8a73;
+  --focus: #f4b223;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-rail: var(--rail);
+  --color-rail-ink: var(--rail-ink);
+  --color-signal: var(--signal);
+  --color-signal-strong: var(--signal-strong);
+  --color-on-signal: var(--on-signal);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---- The one animated moment: the pulse line draws itself once on the login screen ---- */
+@keyframes pp-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pp-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.pp-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: pp-draw 2.4s cubic-bezier(0.45, 0, 0.2, 1) 0.3s forwards;
+}
+.pp-node {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pp-appear 0.35s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .pp-node {
+    animation: none;
+    opacity: 1;
+  }
+}

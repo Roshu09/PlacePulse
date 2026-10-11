@@ -1,0 +1,31 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/auth_db}
+    username: ${DB_USER:placepulse}
+    password: ${DB_PASSWORD:change_me}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt:
+    # must be at least 32 characters (HS256)
+    secret: ${JWT_SECRET:dev_only_secret_change_me_dev_only_secret}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+  tpr:
+    # Registering with this invite code creates a TPR account. Empty = TPR sign-up disabled.
+    invite-code: ${TPR_INVITE_CODE:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

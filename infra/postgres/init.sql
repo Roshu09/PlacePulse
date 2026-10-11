@@ -1,0 +1,3 @@
+CREATE DATABASE auth_db;
+CREATE DATABASE drive_db;
+CREATE DATABASE ai_db;
