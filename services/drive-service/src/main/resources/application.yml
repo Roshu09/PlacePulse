@@ -1,0 +1,31 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: drive-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/drive_db}
+    username: ${DB_USER:placepulse}
+    password: ${DB_PASSWORD:change_me}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt:
+    # Must be the SAME secret as auth-service: that is how this service trusts its tokens.
+    secret: ${JWT_SECRET:dev_only_secret_change_me_dev_only_secret}
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  # "Last date to apply" is judged in this time zone
+  zone: ${APP_ZONE:Asia/Kolkata}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

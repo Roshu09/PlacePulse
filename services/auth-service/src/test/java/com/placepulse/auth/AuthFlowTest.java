@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -172,5 +173,45 @@ class AuthFlowTest {
     @Test
     void wrongInviteCodeIsRejected() throws Exception {
         register("tpr@example.com", "wrong-code", 403);
+    }
+
+    // ---- student profile -----------------------------------------------------------------
+
+    @Test
+    void profileCanBeSavedAndReadBack() throws Exception {
+        String token = registerAndGetToken("asha@example.com", null);
+
+        mvc.perform(put("/api/users/me/profile")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cgpa\":8.25,\"course\":\"MCA\",\"batch\":\"2025-27\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cgpa").value(8.25));
+
+        mvc.perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cgpa").value(8.25))
+                .andExpect(jsonPath("$.course").value("MCA"))
+                .andExpect(jsonPath("$.batch").value("2025-27"));
+    }
+
+    @Test
+    void cgpaAboveTenIsRejected() throws Exception {
+        String token = registerAndGetToken("asha@example.com", null);
+
+        mvc.perform(put("/api/users/me/profile")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cgpa\":10.5,\"course\":\"MCA\",\"batch\":\"2025-27\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.cgpa").exists());
+    }
+
+    @Test
+    void profileUpdateRequiresAToken() throws Exception {
+        mvc.perform(put("/api/users/me/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cgpa\":8.0}"))
+                .andExpect(status().isUnauthorized());
     }
 }

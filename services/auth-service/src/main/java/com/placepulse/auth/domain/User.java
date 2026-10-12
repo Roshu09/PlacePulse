@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,6 +37,16 @@ public class User {
     @Column(nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    // Student profile, filled in after sign-up. Drive eligibility is checked against these.
+    @Column(precision = 4, scale = 2)
+    private BigDecimal cgpa;
+
+    @Column(length = 60)
+    private String course;
+
+    @Column(length = 20)
+    private String batch;
+
     protected User() {
         // for JPA
     }
@@ -53,4 +64,13 @@ public class User {
     public String getFullName() { return fullName; }
     public Role getRole() { return role; }
     public Instant getCreatedAt() { return createdAt; }
+    public BigDecimal getCgpa() { return cgpa; }
+    public String getCourse() { return course; }
+    public String getBatch() { return batch; }
+
+    public void updateProfile(BigDecimal cgpa, String course, String batch) {
+        this.cgpa = cgpa;
+        this.course = course;
+        this.batch = batch;
+    }
 }

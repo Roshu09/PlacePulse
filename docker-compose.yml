@@ -59,5 +59,22 @@ services:
       postgres:
         condition: service_healthy
 
+  drive-service:
+    build: ./services/drive-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/drive_db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+
 volumes:
   pgdata:

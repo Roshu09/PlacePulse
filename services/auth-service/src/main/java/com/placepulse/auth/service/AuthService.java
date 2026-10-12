@@ -5,6 +5,7 @@ import com.placepulse.auth.domain.User;
 import com.placepulse.auth.dto.AuthDtos.AuthResponse;
 import com.placepulse.auth.dto.AuthDtos.LoginRequest;
 import com.placepulse.auth.dto.AuthDtos.RegisterRequest;
+import com.placepulse.auth.dto.AuthDtos.UpdateProfileRequest;
 import com.placepulse.auth.dto.AuthDtos.UserResponse;
 import com.placepulse.auth.exception.ApiException;
 import com.placepulse.auth.repository.UserRepository;
@@ -68,6 +69,17 @@ public class AuthService {
         return users.findById(id)
                 .map(UserResponse::from)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "User no longer exists"));
+    }
+
+    public UserResponse updateProfile(java.util.UUID id, UpdateProfileRequest request) {
+        User user = users.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "User no longer exists"));
+        user.updateProfile(request.cgpa(), blankToNull(request.course()), blankToNull(request.batch()));
+        return UserResponse.from(users.saveAndFlush(user));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /** Everyone is a STUDENT unless they present the TPR invite code. */

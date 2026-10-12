@@ -1,10 +1,14 @@
 package com.placepulse.auth.web;
 
+import com.placepulse.auth.dto.AuthDtos.UpdateProfileRequest;
 import com.placepulse.auth.dto.AuthDtos.UserResponse;
 import com.placepulse.auth.security.AuthenticatedUser;
 import com.placepulse.auth.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,6 +27,12 @@ public class UserController {
     @GetMapping("/users/me")
     public UserResponse me(@AuthenticationPrincipal AuthenticatedUser principal) {
         return authService.me(principal.id());
+    }
+
+    @PutMapping("/users/me/profile")
+    public UserResponse updateProfile(@AuthenticationPrincipal AuthenticatedUser principal,
+                                      @Valid @RequestBody UpdateProfileRequest request) {
+        return authService.updateProfile(principal.id(), request);
     }
 
     /** Placeholder TPR-only endpoint, proves role-based access works. Real TPR APIs come later. */

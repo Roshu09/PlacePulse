@@ -73,12 +73,32 @@ Sign-up and sign-in are wired to auth-service. Students see their application st
 
 Run the tests with `mvn test` (they use an in-memory H2 database, so Docker is not needed).
 
+## Drive API (drive-service, :8082)
+
+Uses the JWT issued by auth-service (same `JWT_SECRET`). When a student applies, drive-service asks auth-service for their profile, passing the student's own token.
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| POST | `/api/drives` | TPR | company, roleTitle, minCgpa, deadline, optional package / location / eligibleBatch |
+| GET | `/api/drives` | any | TPR: all drives with applicant counts. Student: only drives still open to apply |
+| GET | `/api/drives/{id}` | any | one drive |
+| PATCH | `/api/drives/{id}/status` | TPR | `OPEN` or `CLOSED` |
+| POST | `/api/drives/{id}/apply` | student | 422 not eligible, 409 closed / already applied, 503 profile service down |
+| GET | `/api/drives/{id}/applications` | TPR | applicants with CGPA, course, batch |
+| GET | `/api/applications/mine` | student | own applications with stage |
+| PATCH | `/api/applications/{id}/stage` | TPR | `APPLIED, SHORTLISTED, TEST, INTERVIEW, OFFER, REJECTED` |
+
+Auth-service also gained `PUT /api/users/me/profile` (`cgpa`, `course`, `batch`).
+
+Start everything with `./start-backend.sh`. Run each service's tests with `mvn test` inside its folder.
+
 ## Roadmap
 
 - [x] Week 0: repo, infra, auth-service skeleton
 - [x] Week 1a: auth + JWT (register, login, roles, tests)
 - [x] Week 1b: React shell (login, register, role-based layout, dark mode)
-- [ ] Week 2: drive-service, apply flow
+- [x] Week 2a: drive-service (drives, eligibility, apply flow, tests)
+- [ ] Week 2b: drives UI (post a drive, apply, track applications)
 - [ ] Week 3: Kafka events, notification-service
 - [ ] Week 4: LangChain RAG matcher
 - [ ] Week 5: TPR analytics, Redis caching, tests
