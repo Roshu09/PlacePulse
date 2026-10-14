@@ -11,9 +11,15 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
   logout: () => void
+  /** Replace the signed-in user after their profile changed. */
+  updateUser: (user: User) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function getToken(): string {
+  return readToken() ?? ''
+}
 
 function readToken(): string | null {
   try {
@@ -84,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, status, login, register, logout }),
+    () => ({ user, status, login, register, logout, updateUser: setUser }),
     [user, status, login, register, logout],
   )
 

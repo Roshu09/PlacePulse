@@ -1,6 +1,7 @@
 package com.placepulse.drive.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -12,6 +13,8 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 @Entity
@@ -41,9 +44,13 @@ public class Drive {
     @Column(nullable = false, precision = 4, scale = 2)
     private BigDecimal minCgpa;
 
-    /** e.g. "2025-27". Null means every batch can apply. */
-    @Column(length = 20)
-    private String eligibleBatch;
+    /** Pass-out years that may apply, like {2026, 2027}. Empty means every batch can apply. */
+    @Convert(converter = BatchSetConverter.class)
+    @Column(name = "eligible_batches", length = 60)
+    private Set<Integer> eligibleBatches = new TreeSet<>();
+
+    /** When the logo was last set; null when the drive has none. Used to bust browser caches. */
+    private Instant logoUpdatedAt;
 
     /** Last day on which students can apply (inclusive). */
     @Column(nullable = false)
@@ -64,7 +71,7 @@ public class Drive {
     }
 
     public Drive(String company, String roleTitle, String description, String location,
-                 BigDecimal packageLpa, BigDecimal minCgpa, String eligibleBatch,
+                 BigDecimal packageLpa, BigDecimal minCgpa, Set<Integer> eligibleBatches,
                  LocalDate deadline, UUID createdBy) {
         this.company = company;
         this.roleTitle = roleTitle;
@@ -72,9 +79,26 @@ public class Drive {
         this.location = location;
         this.packageLpa = packageLpa;
         this.minCgpa = minCgpa;
-        this.eligibleBatch = eligibleBatch;
+        this.eligibleBatches = eligibleBatches == null ? new TreeSet<>() : new TreeSet<>(eligibleBatches);
         this.deadline = deadline;
         this.createdBy = createdBy;
+    }
+
+    /** Replaces everything the TPR can edit. Status, owner and creation time are untouched. */
+    public void update(String company, String roleTitle, String description, String location,
+                       BigDecimal packageLpa, BigDecimal minCgpa, Set<Integer> eligibleBatches, LocalDate deadline) {
+        this.company = company;
+        this.roleTitle = roleTitle;
+        this.description = description;
+        this.location = location;
+        this.packageLpa = packageLpa;
+        this.minCgpa = minCgpa;
+        this.eligibleBatches = eligibleBatches == null ? new TreeSet<>() : new TreeSet<>(eligibleBatches);
+        this.deadline = deadline;
+    }
+
+    public void logoChanged(boolean hasLogo) {
+        this.logoUpdatedAt = hasLogo ? Instant.now() : null;
     }
 
     /** A drive takes applications while it is open and today is not past the deadline. */
@@ -93,7 +117,8 @@ public class Drive {
     public String getLocation() { return location; }
     public BigDecimal getPackageLpa() { return packageLpa; }
     public BigDecimal getMinCgpa() { return minCgpa; }
-    public String getEligibleBatch() { return eligibleBatch; }
+    public Set<Integer> getEligibleBatches() { return eligibleBatches == null ? Set.of() : eligibleBatches; }
+    public Instant getLogoUpdatedAt() { return logoUpdatedAt; }
     public LocalDate getDeadline() { return deadline; }
     public DriveStatus getStatus() { return status; }
     public UUID getCreatedBy() { return createdBy; }

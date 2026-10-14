@@ -1,3 +1,4 @@
 CREATE DATABASE auth_db;
 CREATE DATABASE drive_db;
 CREATE DATABASE ai_db;
+CREATE DATABASE notification_db;

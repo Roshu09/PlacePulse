@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Briefcase, LayoutGrid, ListChecks, LogOut, Moon, Sun, TrendingUp, Users, type LucideIcon } from 'lucide-react'
+import { Briefcase, LayoutGrid, ListChecks, LogOut, Moon, Sun, TrendingUp, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { NotificationBell } from './NotificationBell'
 import { Wordmark } from './Logo'
 import { IconButton } from './ui'
 import { useAuth } from '../lib/auth'
+import { RealtimeProvider } from '../lib/realtime'
 import { useTheme } from '../lib/theme'
 import type { Role } from '../lib/api'
 
@@ -18,6 +20,7 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/', label: 'Overview', icon: LayoutGrid, end: true },
     { to: '/drives', label: 'Drives', icon: Briefcase },
     { to: '/applications', label: 'Applications', icon: ListChecks },
+    { to: '/profile', label: 'Profile', icon: UserRound },
   ],
   TPR: [
     { to: '/', label: 'Overview', icon: LayoutGrid, end: true },
@@ -42,6 +45,16 @@ function initials(fullName: string): string {
 }
 
 export function AppShell() {
+  const { user } = useAuth()
+  if (!user) return null
+  return (
+    <RealtimeProvider>
+      <Shell />
+    </RealtimeProvider>
+  )
+}
+
+function Shell() {
   const { user, logout } = useAuth()
   const { theme, toggle } = useTheme()
   if (!user) return null
@@ -98,6 +111,7 @@ export function AppShell() {
         <header className="flex items-center px-5 py-3 md:justify-end md:px-10">
           <Wordmark badge className="md:hidden" />
           <div className="ml-auto flex items-center gap-1 md:ml-0">
+            <NotificationBell />
             <IconButton label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'} onClick={toggle}>
               {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
             </IconButton>

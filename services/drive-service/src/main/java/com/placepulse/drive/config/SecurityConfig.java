@@ -35,8 +35,12 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health").permitAll()
+                        // company logos are loaded by <img> tags, which cannot send a token
+                        .requestMatchers(HttpMethod.GET, "/api/drives/*/logo").permitAll()
                         // TPR only
                         .requestMatchers(HttpMethod.POST, "/api/drives").hasRole("TPR")
+                        .requestMatchers(HttpMethod.PUT, "/api/drives/*").hasRole("TPR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/applications/*").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/drives/*/status").hasRole("TPR")
                         .requestMatchers(HttpMethod.GET, "/api/drives/*/applications").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/applications/*/stage").hasRole("TPR")

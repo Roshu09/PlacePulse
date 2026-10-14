@@ -1,9 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { GuestOnly, RequireAuth, RequireRole } from './components/guards'
+import Applications from './pages/Applications'
 import ComingSoon from './pages/ComingSoon'
+import DriveApplicants from './pages/DriveApplicants'
+import Drives from './pages/Drives'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
+import Profile from './pages/Profile'
 import Register from './pages/Register'
 
 export default function App() {
@@ -17,29 +21,15 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<Overview />} />
-          <Route
-            path="drives"
-            element={
-              <ComingSoon
-                title="Drives"
-                description="Browse company drives, check your eligibility and apply before the deadline."
-              />
-            }
-          />
+          <Route path="drives" element={<Drives />} />
 
           <Route element={<RequireRole role="STUDENT" />}>
-            <Route
-              path="applications"
-              element={
-                <ComingSoon
-                  title="Applications"
-                  description="Follow each application from applied to offer, with the status of every round."
-                />
-              }
-            />
+            <Route path="applications" element={<Applications />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
 
           <Route element={<RequireRole role="TPR" />}>
+            <Route path="drives/:id" element={<DriveApplicants />} />
             <Route
               path="students"
               element={

@@ -8,6 +8,22 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/drive_db}
     username: ${DB_USER:placepulse}
     password: ${DB_PASSWORD:change_me}
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        # if the broker is down, give up quickly instead of hanging a user request for a minute
+        max.block.ms: 2000
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 6000
+  servlet:
+    multipart:
+      # a logo is capped at 500 KB in the service; this is only the outer limit that protects the server
+      max-file-size: 1MB
+      max-request-size: 2MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -20,6 +36,9 @@ management:
         include: health,info
 
 app:
+  events:
+    enabled: ${EVENTS_ENABLED:true}
+    topic: placepulse.events
   jwt:
     # Must be the SAME secret as auth-service: that is how this service trusts its tokens.
     secret: ${JWT_SECRET:dev_only_secret_change_me_dev_only_secret}

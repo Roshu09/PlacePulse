@@ -5,6 +5,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.LinkedHashMap;
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex) {
         return ResponseEntity.badRequest().body(new ApiError(400, "The request body is not valid.", Map.of()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> handleTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(413).body(new ApiError(413, "Validation failed",
+                Map.of("logo", "The logo is too large. Use a PNG under 500 KB.")));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

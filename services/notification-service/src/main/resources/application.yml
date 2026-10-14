@@ -1,0 +1,44 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/notification_db}
+    username: ${DB_USER:placepulse}
+    password: ${DB_PASSWORD:change_me}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    consumer:
+      group-id: notification-service
+      # a brand-new group reads the topic from the start, so no event is missed on first run
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      # only used to park unprocessable messages on the dead-letter topic
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 2000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  events:
+    enabled: ${EVENTS_ENABLED:true}
+    topic: placepulse.events
+  jwt:
+    # Must be the SAME secret as auth-service.
+    secret: ${JWT_SECRET:dev_only_secret_change_me_dev_only_secret}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}

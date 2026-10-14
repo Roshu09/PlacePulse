@@ -6,6 +6,8 @@ import com.placepulse.drive.domain.DriveStatus;
 import com.placepulse.drive.domain.Stage;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -13,6 +15,8 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public final class DriveDtos {
@@ -27,8 +31,11 @@ public final class DriveDtos {
             @Size(max = 120) String location,
             @DecimalMin("0.0") @DecimalMax("1000.0") BigDecimal packageLpa,
             @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal minCgpa,
-            @Size(max = 20) String eligibleBatch,
-            @NotNull LocalDate deadline) {
+            /** Pass-out years that may apply, like [2026, 2027]. Empty or missing means every batch. */
+            @Size(max = 10) List<@Min(2000) @Max(2100) Integer> eligibleBatches,
+            @NotNull LocalDate deadline,
+            /** Edit only: true deletes the current logo. */
+            Boolean removeLogo) {
     }
 
     public record UpdateStatusRequest(@NotNull DriveStatus status) {
@@ -48,7 +55,8 @@ public final class DriveDtos {
             String location,
             BigDecimal packageLpa,
             BigDecimal minCgpa,
-            String eligibleBatch,
+            List<Integer> eligibleBatches,
+            String logoUrl,
             LocalDate deadline,
             DriveStatus status,
             boolean acceptingApplications,
@@ -58,9 +66,15 @@ public final class DriveDtos {
 
         public static DriveResponse of(Drive d, LocalDate today, Long applicantCount, Boolean applied) {
             return new DriveResponse(d.getId(), d.getCompany(), d.getRoleTitle(), d.getDescription(),
-                    d.getLocation(), d.getPackageLpa(), d.getMinCgpa(), d.getEligibleBatch(), d.getDeadline(),
+                    d.getLocation(), d.getPackageLpa(), d.getMinCgpa(), new ArrayList<>(d.getEligibleBatches()), DriveDtos.logoPath(d), d.getDeadline(),
                     d.getStatus(), d.isAccepting(today), applicantCount, applied, d.getCreatedAt());
         }
+    }
+
+    /** Relative to this service. The version in the query string changes whenever the logo does. */
+    static String logoPath(Drive d) {
+        return d.getLogoUpdatedAt() == null ? null
+                : "/api/drives/" + d.getId() + "/logo?v=" + d.getLogoUpdatedAt().toEpochMilli();
     }
 
     public record ApplicationResponse(

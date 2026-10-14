@@ -18,7 +18,7 @@ auth-service        drive-service     ai-service
   |                     |                  |
 Postgres (auth)     Postgres (drive)   Vector store
                         |
-                     Kafka topics ---> notification-service (Node.js)
+                     Kafka topic ---> notification-service (Spring Boot)
 ```
 
 Each service owns its own database. Services communicate through the gateway (sync) and Kafka events (async).
@@ -30,7 +30,7 @@ Each service owns its own database. Services communicate through the gateway (sy
 | gateway | Spring Cloud Gateway | Routing, JWT validation |
 | auth-service | Spring Boot, Spring Security, PostgreSQL | Login, roles (STUDENT / TPR), profiles |
 | drive-service | Spring Boot, PostgreSQL, Kafka | Drives, eligibility rules, applications |
-| notification-service | Node.js, Kafka | Email / Telegram alerts from events |
+| notification-service | Spring Boot, Kafka, PostgreSQL | In-app notifications built from events (new drive, new application, stage change) |
 | ai-service | Python, FastAPI, LangChain | RAG resume vs JD matcher |
 | frontend | React, Tailwind, shadcn/ui | Student and TPR dashboards |
 
@@ -79,18 +79,51 @@ Uses the JWT issued by auth-service (same `JWT_SECRET`). When a student applies,
 
 | Method | Path | Who | Notes |
 |---|---|---|---|
-| POST | `/api/drives` | TPR | company, roleTitle, minCgpa, deadline, optional package / location / eligibleBatch |
+| POST | `/api/drives` | TPR | JSON, or multipart (`drive` JSON part + optional `logo` PNG part). company, roleTitle, minCgpa, deadline, optional package / location / `eligibleBatches` (pass-out years, empty = any) |
+| PUT | `/api/drives/{id}` | TPR | edit a drive (same body; `removeLogo` deletes the logo). Existing applications stay. Publishes `drive.updated` |
+| GET | `/api/drives/{id}/logo` | public | the PNG (max 500 KB, checked by file signature) |
 | GET | `/api/drives` | any | TPR: all drives with applicant counts. Student: only drives still open to apply |
 | GET | `/api/drives/{id}` | any | one drive |
 | PATCH | `/api/drives/{id}/status` | TPR | `OPEN` or `CLOSED` |
 | POST | `/api/drives/{id}/apply` | student | 422 not eligible, 409 closed / already applied, 503 profile service down |
 | GET | `/api/drives/{id}/applications` | TPR | applicants with CGPA, course, batch |
 | GET | `/api/applications/mine` | student | own applications with stage |
+| DELETE | `/api/applications/{id}` | TPR | removes an application so the student can apply again. Publishes `application.removed` |
 | PATCH | `/api/applications/{id}/stage` | TPR | `APPLIED, SHORTLISTED, TEST, INTERVIEW, OFFER, REJECTED` |
 
 Auth-service also gained `PUT /api/users/me/profile` (`cgpa`, `course`, `batch`).
 
-Start everything with `./start-backend.sh`. Run each service's tests with `mvn test` inside its folder.
+Start everything with `./start-backend.sh` (auth :8081, drive :8082, notification :8083). Run each service's tests with `mvn test` inside its folder.
+
+## Events (Kafka)
+
+drive-service publishes to one topic, `placepulse.events` (3 partitions, keyed by application or drive id so one application's events stay in order). Every message is an envelope: `{eventId, type, occurredAt, payload}`.
+
+| type | When | Who gets notified |
+|---|---|---|
+| `drive.created` | a TPR posts a drive | every student the service has seen |
+| `application.submitted` | a student applies | the TPR who posted the drive |
+| `application.stage-changed` | a TPR moves an applicant | that student |
+
+Reliability choices:
+- **Published after the database commit**, and a broker outage is logged, never shown to the user: applying still works with Kafka down.
+- **Live push (SSE):** a notification is pushed to the open browser tab right after it is stored, so dashboards update without a refresh. The browser reads the stream with `fetch` (so the JWT stays in a header, not a URL), reconnects with backoff, and re-fetches everything after a reconnect. While the stream is down it falls back to polling every 15s.
+- **At-least-once, idempotent consumer:** a notification is unique per `(eventId, recipient)`, so a redelivered event never notifies twice.
+- **Retries then dead-letter:** a failing message is retried 3 times, then parked on `placepulse.events.DLT`. A message that can never work (broken JSON, missing field) goes there at once. Browse both topics in the console at http://localhost:8089.
+- **Loose coupling:** the consumer reads JSON by field name and shares no classes with drive-service.
+
+## Notification API (notification-service, :8083)
+
+Same JWT as the other services. Everyone, student or TPR, sees only their own.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/notifications` | latest 30 plus `unreadCount` |
+| GET | `/api/notifications/stream` | live Server-Sent Events: `ready`, `ping` every 20s, `notification` when one is saved |
+| POST | `/api/notifications/{id}/read` | 404 if it isn't yours |
+| POST | `/api/notifications/read-all` | returns `{updated}` |
+
+A student becomes reachable for "new drive" notifications the first time they open the app (the bell calls this API on every page).
 
 ## Roadmap
 
@@ -98,8 +131,8 @@ Start everything with `./start-backend.sh`. Run each service's tests with `mvn t
 - [x] Week 1a: auth + JWT (register, login, roles, tests)
 - [x] Week 1b: React shell (login, register, role-based layout, dark mode)
 - [x] Week 2a: drive-service (drives, eligibility, apply flow, tests)
-- [ ] Week 2b: drives UI (post a drive, apply, track applications)
-- [ ] Week 3: Kafka events, notification-service
+- [x] Week 2b: drives UI (post a drive, apply, track applications, student profile)
+- [x] Week 3: Kafka events, notification-service, notification bell
 - [ ] Week 4: LangChain RAG matcher
 - [ ] Week 5: TPR analytics, Redis caching, tests
 - [ ] Week 6: deploy, CI/CD, k6 load test, demo video

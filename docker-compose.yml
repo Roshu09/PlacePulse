@@ -67,6 +67,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       AUTH_SERVICE_URL: http://auth-service:8081
+      KAFKA_BROKERS: redpanda:29092
       JAVA_TOOL_OPTIONS: -Xmx256m
     ports:
       - "8082:8082"
@@ -74,6 +75,25 @@ services:
       postgres:
         condition: service_healthy
       auth-service:
+        condition: service_started
+      redpanda:
+        condition: service_started
+
+  notification-service:
+    build: ./services/notification-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/notification_db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      KAFKA_BROKERS: redpanda:29092
+      JAVA_TOOL_OPTIONS: -Xmx256m
+    ports:
+      - "8083:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
         condition: service_started
 
 volumes:

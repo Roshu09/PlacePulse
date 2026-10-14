@@ -1,4 +1,4 @@
-import { forwardRef, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
@@ -73,7 +73,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
           type={isPassword && shown ? 'text' : type}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
-          className={`h-11 w-full rounded-lg border bg-surface px-3.5 text-[15px] placeholder:text-ink-soft/70 ${
+          className={`h-11 w-full rounded-lg border bg-surface px-3.5 text-[15px] placeholder:text-ink-soft/50 ${
             error ? 'border-bad' : 'border-line'
           } ${isPassword ? 'pr-11' : ''}`}
         />
@@ -107,5 +107,59 @@ export function FormError({ children }: { children: ReactNode }) {
     <p role="alert" className="rounded-lg border border-bad/40 bg-bad/10 px-3.5 py-2.5 text-sm text-bad">
       {children}
     </p>
+  )
+}
+
+const controlClass = (error?: string) =>
+  `w-full rounded-lg border bg-surface px-3.5 text-[15px] placeholder:text-ink-soft/50 ${error ? 'border-bad' : 'border-line'}`
+
+export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; error?: string; hint?: string }>(
+  function TextArea({ label, error, hint, className = '', ...rest }, ref) {
+    const id = useId()
+    return (
+      <div className={className}>
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+          {label}
+        </label>
+        <textarea {...rest} ref={ref} id={id} aria-invalid={error ? true : undefined} className={`${controlClass(error)} min-h-24 py-2.5`} />
+        {error ? <p className="mt-1.5 text-sm text-bad">{error}</p> : hint ? <p className="mt-1.5 text-sm text-ink-soft">{hint}</p> : null}
+      </div>
+    )
+  },
+)
+
+export function Select({
+  label,
+  className = '',
+  children,
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement> & { label?: string }) {
+  const id = useId()
+  return (
+    <div className={className}>
+      {label && (
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+          {label}
+        </label>
+      )}
+      <select {...rest} id={id} className={`${controlClass()} h-11`}>
+        {children}
+      </select>
+    </div>
+  )
+}
+
+type Tone = 'neutral' | 'good' | 'bad' | 'signal'
+
+const tones: Record<Tone, string> = {
+  neutral: 'bg-sunken text-ink-soft',
+  good: 'bg-good/15 text-good',
+  bad: 'bg-bad/12 text-bad',
+  signal: 'bg-signal/25 text-ink',
+}
+
+export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>
   )
 }
