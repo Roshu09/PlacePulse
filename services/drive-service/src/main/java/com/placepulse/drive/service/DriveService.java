@@ -51,6 +51,7 @@ public class DriveService {
     private final Clock clock;
     private final EventPublisher events;
     private final TransactionTemplate tx;
+    private final com.placepulse.drive.analytics.AnalyticsService analytics;
 
     public DriveService(DriveRepository drives,
                         DriveApplicationRepository applications,
@@ -58,7 +59,8 @@ public class DriveService {
                         ProfileClient profileClient,
                         Clock clock,
                         EventPublisher events,
-                        TransactionTemplate tx) {
+                        TransactionTemplate tx,
+                        com.placepulse.drive.analytics.AnalyticsService analytics) {
         this.drives = drives;
         this.applications = applications;
         this.logos = logos;
@@ -66,6 +68,7 @@ public class DriveService {
         this.clock = clock;
         this.events = events;
         this.tx = tx;
+        this.analytics = analytics;
     }
 
     // ---- drives ---------------------------------------------------------------------------
@@ -210,6 +213,7 @@ public class DriveService {
         Drive drive = findDrive(id);
         drive.setStatus(status);
         Drive saved = drives.save(drive);
+        analytics.invalidate();   // open/closed changes the "open drives" number
         Long count = applicantCounts(List.of(id)).getOrDefault(id, 0L);
         return DriveResponse.of(saved, LocalDate.now(clock), count, null);
     }
@@ -395,6 +399,12 @@ public class DriveService {
      * a user's action, so any failure here is logged and swallowed.
      */
     private void emit(String key, String type, Object payload) {
+        // every change that emits an event also changes the numbers on the analytics page
+        try {
+            analytics.invalidate();
+        } catch (RuntimeException e) {
+            log.warn("Could not clear the analytics cache: {}", e.getMessage());
+        }
         try {
             events.publish(key, type, payload);
         } catch (RuntimeException e) {

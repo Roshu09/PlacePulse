@@ -11,3 +11,5 @@ spring:
 app:
   events:
     enabled: false
+  cache:
+    enabled: false

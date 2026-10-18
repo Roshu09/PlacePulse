@@ -5,16 +5,16 @@ import { getToken, useAuth } from './auth'
 import { openStream } from './sse'
 
 /** A kind of page data that can go stale. Pages say which kinds they show; events say which kinds changed. */
-export type Topic = 'drives' | 'applications' | 'applicants'
+export type Topic = 'drives' | 'applications' | 'applicants' | 'analytics'
 
-const ALL_TOPICS: Topic[] = ['drives', 'applications', 'applicants']
+const ALL_TOPICS: Topic[] = ['drives', 'applications', 'applicants', 'analytics']
 
 const TOPICS_BY_EVENT: Record<string, Topic[]> = {
-  'drive.created': ['drives'],
-  'drive.updated': ['drives', 'applications', 'applicants'],
-  'application.submitted': ['applicants', 'drives'],
-  'application.stage-changed': ['applications'],
-  'application.removed': ['applications', 'drives', 'applicants'],
+  'drive.created': ['drives', 'analytics'],
+  'drive.updated': ['drives', 'applications', 'applicants', 'analytics'],
+  'application.submitted': ['applicants', 'drives', 'analytics'],
+  'application.stage-changed': ['applications', 'analytics'],
+  'application.removed': ['applications', 'drives', 'applicants', 'analytics'],
 }
 
 const FALLBACK_POLL_MS = 15_000
@@ -51,7 +51,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
   const [live, setLive] = useState(false)
-  const [versions, setVersions] = useState<Versions>({ drives: 0, applications: 0, applicants: 0 })
+  const [versions, setVersions] = useState<Versions>({ drives: 0, applications: 0, applicants: 0, analytics: 0 })
   const [toasts, setToasts] = useState<Toast[]>([])
   const known = useRef<Set<string>>(new Set())
 

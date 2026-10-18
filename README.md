@@ -97,6 +97,22 @@ Auth-service also gained `PUT /api/users/me/profile` (`cgpa`, `course`, `batch`)
 
 Start everything with `./start-backend.sh` (auth :8081, drive :8082, notification :8083). Run each service's tests with `mvn test` inside its folder.
 
+### Analytics (TPR only)
+
+`GET /api/analytics` returns totals (placement rate, offers, average and highest package, average CGPA), the stage funnel, per-drive numbers and a 14-day application timeline. Everything is aggregated in the database (`GROUP BY` queries, no row loading). The finished JSON is cached in Redis under one key; every write that publishes an event, and every drive open/close, deletes that key, and a 60 s TTL is the safety net. If Redis is down the endpoint still works, just slower (the cache fails open, and Redis is excluded from the health check on purpose).
+
+Response headers `X-Cache: HIT|MISS` and `X-Compute-Ms` show what happened. `?nocache=true` skips Redis entirely.
+
+Measure it yourself:
+
+```bash
+./scripts/seed-analytics.sh 100000          # fake drives + applications (all marked, removable)
+TPR_EMAIL=you@x.com TPR_PASSWORD=... ./scripts/bench-analytics.sh 200
+./scripts/seed-analytics.sh --clean         # remove the fake rows
+```
+
+For screenshots and demos, `./scripts/seed-demo.sh` loads a small realistic season instead (8 fictional companies, a 75-student batch, offers, debarred students, a 14-day application curve). It is repeatable, and `./scripts/seed-demo.sh --clean` removes it.
+
 ## Events (Kafka)
 
 drive-service publishes to one topic, `placepulse.events` (3 partitions, keyed by application or drive id so one application's events stay in order). Every message is an envelope: `{eventId, type, occurredAt, payload}`.
@@ -136,7 +152,8 @@ A student becomes reachable for "new drive" notifications the first time they op
 - [x] Week 2b: drives UI (post a drive, apply, track applications, student profile)
 - [x] Week 3: Kafka events, notification-service, notification bell
 - [x] Week 4: resume matcher (PDF upload, local embeddings, retrieval, Groq analysis, TPR ranking)
-- [ ] Week 5: TPR analytics, Redis caching, tests
+- [x] Week 5a: TPR analytics page + Redis cache (benchmark tooling included)
+- [ ] Week 5b: more analytics (per-batch, per-course), cache metrics
 - [ ] Week 6: deploy, CI/CD, k6 load test, demo video
 
 ## Metrics (fill with measured values only)

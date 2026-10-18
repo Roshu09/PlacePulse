@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/drives/*/applications.csv").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/applications/stage").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/applications/*/stage").hasRole("TPR")
+                        .requestMatchers(HttpMethod.GET, "/api/analytics").hasRole("TPR")
                         // students only
                         .requestMatchers(HttpMethod.POST, "/api/drives/*/apply").hasRole("STUDENT")
                         .requestMatchers(HttpMethod.GET, "/api/applications/mine").hasRole("STUDENT")
@@ -71,6 +72,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // lets the browser (and the dashboard) read the cache headers
+        config.setExposedHeaders(List.of("X-Cache", "X-Compute-Ms", "Content-Disposition"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { GuestOnly, RequireAuth, RequireRole } from './components/guards'
 import Applications from './pages/Applications'
+import Analytics from './pages/Analytics'
 import ComingSoon from './pages/ComingSoon'
 import DriveApplicants from './pages/DriveApplicants'
 import Drives from './pages/Drives'
@@ -39,15 +40,7 @@ export default function App() {
                 />
               }
             />
-            <Route
-              path="analytics"
-              element={
-                <ComingSoon
-                  title="Analytics"
-                  description="Batch-wide numbers for every drive: applications, shortlists and offers."
-                />
-              }
-            />
+            <Route path="analytics" element={<Analytics />} />
           </Route>
         </Route>
       </Route>

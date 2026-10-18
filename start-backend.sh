@@ -14,6 +14,8 @@ export DB_USER="$POSTGRES_USER" DB_PASSWORD="$POSTGRES_PASSWORD"
 export KAFKA_BROKERS=localhost:9092
 # ai-service reads the same database settings (host port 5433) and the Groq key
 export DB_HOST=localhost DB_PORT=5433
+# drive-service caches the analytics page in Redis (host port 6381)
+export REDIS_HOST=localhost REDIS_PORT=6381
 
 # init.sql only runs when the Postgres volume is first created, so make sure every database exists
 for db in auth_db drive_db notification_db ai_db; do

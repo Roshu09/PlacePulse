@@ -204,6 +204,60 @@ async function request<T>(base: string, path: string, init: RequestInit = {}, to
   return (await response.json()) as T
 }
 
+export interface Analytics {
+  totals: {
+    drives: number
+    openDrives: number
+    applications: number
+    studentsApplied: number
+    studentsPlaced: number
+    offers: number
+    placementRate: number
+    averageCgpaApplicants: number | null
+    averageCgpaPlaced: number | null
+    averagePackageLpa: number | null
+    highestPackageLpa: number | null
+  }
+  funnel: Record<string, number>
+  drives: {
+    driveId: string
+    company: string
+    roleTitle: string
+    status: string
+    deadline: string
+    applicants: number
+    shortlisted: number
+    offers: number
+    conversion: number
+  }[]
+  timeline: { date: string; applications: number }[]
+  generatedAt: string
+}
+
+/** The analytics plus how the server produced them (from the X-Cache and X-Compute-Ms headers). */
+export interface AnalyticsResult {
+  data: Analytics
+  cache: 'HIT' | 'MISS' | null
+  serverMs: number | null
+}
+
+async function fetchAnalytics(token: string): Promise<AnalyticsResult> {
+  let response: Response
+  try {
+    response = await fetch(`${DRIVE_URL}/api/analytics`, { headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check that the backend is running and try again.")
+  }
+  if (!response.ok) throw new ApiError(response.status, 'Could not load analytics. Try again.')
+  const cache = response.headers.get('X-Cache')
+  const ms = response.headers.get('X-Compute-Ms')
+  return {
+    data: (await response.json()) as Analytics,
+    cache: cache === 'HIT' || cache === 'MISS' ? cache : null,
+    serverMs: ms === null ? null : Number(ms),
+  }
+}
+
 /** Where to load a drive's logo from, or null when it has none. */
 export function logoSrc(drive: Pick<Drive, 'logoUrl'>): string | null {
   return drive.logoUrl ? `${DRIVE_URL}${drive.logoUrl}` : null
@@ -256,6 +310,8 @@ export const api = {
     request<RankedApplicant[]>(AI_URL, `/api/matches/drives/${driveId}/applicants`, {}, token),
 
   // ---- drive-service ----
+  analytics: (token: string) => fetchAnalytics(token),
+
   drives: (token: string) => request<Drive[]>(DRIVE_URL, '/api/drives', {}, token),
 
   drive: (token: string, id: string) => request<Drive>(DRIVE_URL, `/api/drives/${id}`, {}, token),

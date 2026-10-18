@@ -8,6 +8,12 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/drive_db}
     username: ${DB_USER:placepulse}
     password: ${DB_PASSWORD:change_me}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6381}
+      timeout: 500ms
+      connect-timeout: 500ms
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
     consumer:
@@ -36,12 +42,19 @@ spring:
     open-in-view: false
 
 management:
+  health:
+    redis:
+      # a Redis outage only slows the dashboard; it must not mark the whole service DOWN
+      enabled: false
   endpoints:
     web:
       exposure:
         include: health,info
 
 app:
+  cache:
+    enabled: ${CACHE_ENABLED:true}
+    analytics-ttl-seconds: 60
   events:
     enabled: ${EVENTS_ENABLED:true}
     topic: placepulse.events
