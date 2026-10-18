@@ -1,6 +1,7 @@
 package com.placepulse.drive.web;
 
 import com.placepulse.drive.dto.DriveDtos.ApplicationResponse;
+import com.placepulse.drive.dto.DriveDtos.BulkStageRequest;
 import com.placepulse.drive.dto.DriveDtos.UpdateStageRequest;
 import com.placepulse.drive.security.AuthenticatedUser;
 import com.placepulse.drive.service.DriveService;
@@ -39,6 +40,12 @@ public class ApplicationController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remove(@PathVariable UUID id) {
         service.removeApplication(id);
+    }
+
+    /** Moves several applications to one stage at once. */
+    @PatchMapping("/stage")
+    public List<ApplicationResponse> bulkStage(@Valid @RequestBody BulkStageRequest request) {
+        return service.bulkUpdateStage(request.ids(), request.stage());
     }
 
     @PatchMapping("/{id}/stage")

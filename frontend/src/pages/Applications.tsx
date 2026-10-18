@@ -53,13 +53,17 @@ export default function Applications() {
                     <p className="text-ink-soft">{app.roleTitle}</p>
                   </div>
                   <div className="text-right">
-                    <Badge tone={app.stage === 'OFFER' ? 'good' : app.stage === 'REJECTED' ? 'bad' : 'signal'}>
+                    <Badge tone={app.stage === 'OFFER' ? 'good' : app.stage === 'REJECTED' || app.stage === 'DEBARRED' ? 'bad' : 'signal'}>
                       {STAGE_LABEL[app.stage]}
                     </Badge>
                     <p className="mt-1 text-xs text-ink-soft">Applied {formatInstant(app.appliedAt)}</p>
                   </div>
                 </div>
-                {app.stage === 'REJECTED' ? (
+                {app.stage === 'DEBARRED' ? (
+                  <p className="text-sm text-ink-soft">
+                    You edited your profile after registering, so this application is on hold. Ask your placement team to reinstate it.
+                  </p>
+                ) : app.stage === 'REJECTED' ? (
                   <p className="text-sm text-ink-soft">You were not selected for this drive. Keep going, the next one is on the Drives page.</p>
                 ) : (
                   <StageTrack reached={stageReached(app.stage)} />

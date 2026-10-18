@@ -20,6 +20,9 @@ public final class EligibilityChecker {
 
     /** Returns why the student cannot apply, or empty if they can. */
     public static Optional<String> check(Drive drive, StudentProfile profile) {
+        if (!Boolean.TRUE.equals(profile.placementRegistered())) {
+            return Optional.of("Register for placements from your profile before applying.");
+        }
         if (profile.cgpa() == null) {
             return Optional.of("Add your CGPA to your profile before applying.");
         }

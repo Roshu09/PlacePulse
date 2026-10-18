@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Starts everything the backend needs: Postgres, Redis, Redpanda, then auth, drive and notification services.
-# Press Ctrl+C once to stop all three services.
+# Starts everything the backend needs: Postgres, Redis, Redpanda, then auth, drive, notification and ai services.
+# Press Ctrl+C once to stop all the services.
 set -e
 cd "$(dirname "$0")"
 
@@ -9,6 +9,11 @@ docker compose up -d --wait postgres redis redpanda
 # load passwords, the JWT secret and the TPR invite code from .env
 set -a; source .env; set +a
 export DB_USER="$POSTGRES_USER" DB_PASSWORD="$POSTGRES_PASSWORD"
+# services run on this machine, so they reach Redpanda through the port it publishes on localhost
+# (an old .env may still say redpanda:9092, a name that only exists inside Docker)
+export KAFKA_BROKERS=localhost:9092
+# ai-service reads the same database settings (host port 5433) and the Groq key
+export DB_HOST=localhost DB_PORT=5433
 
 # init.sql only runs when the Postgres volume is first created, so make sure every database exists
 for db in auth_db drive_db notification_db ai_db; do
@@ -29,4 +34,5 @@ trap 'kill 0' EXIT INT TERM
 (cd services/auth-service         && mvn -q spring-boot:run 2>&1 | sed -u 's/^/[auth]   /') &
 (cd services/drive-service        && mvn -q spring-boot:run 2>&1 | sed -u 's/^/[drive]  /') &
 (cd services/notification-service && mvn -q spring-boot:run 2>&1 | sed -u 's/^/[notify] /') &
+(cd services/ai-service           && ./run.sh 2>&1 | sed -u 's/^/[ai]     /') &
 wait

@@ -102,6 +102,15 @@ public class DriveController {
         return service.apply(id, user, authorization);
     }
 
+    @GetMapping(value = "/{id}/applications.csv", produces = "text/csv")
+    public org.springframework.http.ResponseEntity<byte[]> applicantsCsv(@PathVariable UUID id) {
+        byte[] body = service.applicantsCsv(id).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return org.springframework.http.ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + service.applicantsCsvName(id) + "\"")
+                .contentType(new org.springframework.http.MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8))
+                .body(body);
+    }
+
     @GetMapping("/{id}/applications")
     public List<ApplicationResponse> applicants(@PathVariable UUID id) {
         return service.applicants(id);

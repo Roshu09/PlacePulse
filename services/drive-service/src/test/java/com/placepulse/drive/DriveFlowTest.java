@@ -65,6 +65,7 @@ class DriveFlowTest {
     @Autowired MockMvc mvc;
     @Autowired DriveRepository drives;
     @Autowired DriveApplicationRepository applications;
+    @Autowired com.placepulse.drive.events.ProfileEventHandler profileEvents;
     @Value("${app.jwt.secret}") String jwtSecret;
 
     // auth-service is not running in these tests, so its answer is faked
@@ -108,7 +109,7 @@ class DriveFlowTest {
     private void profileIs(String cgpa, String course, String batch) {
         when(profileClient.fetch(anyString())).thenReturn(new StudentProfile(
                 UUID.randomUUID(), "asha@example.com", "Asha Verma", "STUDENT",
-                cgpa == null ? null : new BigDecimal(cgpa), course, batch));
+                cgpa == null ? null : new BigDecimal(cgpa), course, batch, true));
     }
 
     private static String bearer(String token) {
@@ -676,5 +677,169 @@ class DriveFlowTest {
     void removingAnUnknownApplicationIsNotFound() throws Exception {
         mvc.perform(delete("/api/applications/" + UUID.randomUUID()).header("Authorization", bearer(tprToken)))
                 .andExpect(status().isNotFound());
+    }
+
+    // ---- placement registration and debarring ----------------------------------------------
+
+    private String profileEditedEvent(UUID studentId) {
+        return "{\"eventId\":\"" + UUID.randomUUID() + "\",\"type\":\"profile.edited\",\"occurredAt\":\"2026-10-14T10:00:00Z\","
+                + "\"payload\":{\"studentId\":\"" + studentId + "\",\"studentName\":\"Asha Verma\"}}";
+    }
+
+    private String applyAndGetId(UUID drive) throws Exception {
+        MvcResult r = apply(ashaToken, drive).andExpect(status().isCreated()).andReturn();
+        return JsonPath.read(r.getResponse().getContentAsString(), "$.id");
+    }
+
+    @Test
+    void anUnregisteredStudentCannotApply() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        when(profileClient.fetch(anyString())).thenReturn(new StudentProfile(
+                ashaId, "asha@example.com", "Asha Verma", "STUDENT", new BigDecimal("8.20"), "MCA", "2027", false));
+
+        apply(ashaToken, acme)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", containsString("Register for placements")));
+    }
+
+    @Test
+    void editingTheProfileDebarsApplicationsInProgress() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        UUID globex = createDrive("Globex", "7.0", null);
+        String acmeApp = applyAndGetId(acme);
+        String globexApp = applyAndGetId(globex);
+        patchJson("/api/applications/" + globexApp + "/stage", tprToken, "{\"stage\":\"INTERVIEW\"}")
+                .andExpect(status().isOk());
+
+        profileEvents.handle(profileEditedEvent(ashaId));
+
+        mvc.perform(get("/api/applications/mine").header("Authorization", bearer(ashaToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.company=='Acme')].stage").value("DEBARRED"))
+                .andExpect(jsonPath("$[?(@.company=='Acme')].debarredFrom").value("APPLIED"))
+                .andExpect(jsonPath("$[?(@.company=='Globex')].debarredFrom").value("INTERVIEW"));
+
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        verify(events).publish(eq(acmeApp), eq(DriveEvents.STAGE_CHANGED), payload.capture());
+        assertThat(((DriveEvents.StageChanged) payload.getValue()).toStage()).isEqualTo("DEBARRED");
+    }
+
+    @Test
+    void offersAndRejectionsSurviveAProfileEdit() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        UUID globex = createDrive("Globex", "7.0", null);
+        String acmeApp = applyAndGetId(acme);
+        String globexApp = applyAndGetId(globex);
+        patchJson("/api/applications/" + acmeApp + "/stage", tprToken, "{\"stage\":\"OFFER\"}").andExpect(status().isOk());
+        patchJson("/api/applications/" + globexApp + "/stage", tprToken, "{\"stage\":\"REJECTED\"}").andExpect(status().isOk());
+
+        profileEvents.handle(profileEditedEvent(ashaId));
+
+        mvc.perform(get("/api/applications/mine").header("Authorization", bearer(ashaToken)))
+                .andExpect(jsonPath("$[?(@.company=='Acme')].stage").value("OFFER"))
+                .andExpect(jsonPath("$[?(@.company=='Globex')].stage").value("REJECTED"));
+    }
+
+    @Test
+    void theSameProfileEventTwiceDebarsOnce() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        applyAndGetId(acme);
+        String event = profileEditedEvent(ashaId);
+
+        profileEvents.handle(event);
+        profileEvents.handle(event);
+
+        verify(events, org.mockito.Mockito.times(1)).publish(any(), eq(DriveEvents.STAGE_CHANGED), any());
+    }
+
+    @Test
+    void theTprCanReinstateADebarredApplication() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        String app = applyAndGetId(acme);
+        patchJson("/api/applications/" + app + "/stage", tprToken, "{\"stage\":\"SHORTLISTED\"}").andExpect(status().isOk());
+        profileEvents.handle(profileEditedEvent(ashaId));
+
+        patchJson("/api/applications/" + app + "/stage", tprToken, "{\"stage\":\"SHORTLISTED\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("SHORTLISTED"))
+                .andExpect(jsonPath("$.debarredFrom").doesNotExist());
+    }
+
+    @Test
+    void aDebarredStudentCanStillApplyToNewDrives() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        applyAndGetId(acme);
+        profileEvents.handle(profileEditedEvent(ashaId));
+
+        UUID globex = createDrive("Globex", "7.0", null);
+        apply(ashaToken, globex).andExpect(status().isCreated()).andExpect(jsonPath("$.stage").value("APPLIED"));
+    }
+
+    @Test
+    void otherEventsAreIgnoredAndBrokenOnesAreRejected() throws Exception {
+        profileEvents.handle("{\"type\":\"drive.created\",\"payload\":{}}");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> profileEvents.handle("not json"))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        profileEvents.handle("{\"type\":\"profile.edited\",\"payload\":{}}"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ---- CSV export and bulk stage change ---------------------------------------------------
+
+    @Test
+    void tprCanDownloadApplicantsAsCsv() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        when(profileClient.fetch(anyString())).thenReturn(new StudentProfile(
+                ashaId, "asha@example.com", "=HYPERLINK(\"evil\")", "STUDENT", new BigDecimal("8.20"), "MCA", "2027",
+                true, "9876543210", "https://example.com/cv.pdf"));
+        apply(ashaToken, acme).andExpect(status().isCreated());
+
+        MvcResult result = mvc.perform(get("/api/drives/" + acme + "/applications.csv").header("Authorization", bearer(tprToken)))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", containsString("Acme-SDE-Intern-applicants.csv")))
+                .andReturn();
+        String csv = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(csv).contains("\"Name\",\"Email\",\"Phone\"");
+        assertThat(csv).contains("\"9876543210\"").contains("\"https://example.com/cv.pdf\"").contains("\"APPLIED\"");
+        // a student-typed value that looks like a formula must not run in Excel
+        assertThat(csv).contains("\"'=HYPERLINK(").doesNotContain(",\"=HYPERLINK");
+    }
+
+    @Test
+    void studentsCannotDownloadTheCsv() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        mvc.perform(get("/api/drives/" + acme + "/applications.csv").header("Authorization", bearer(ashaToken)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void bulkStageMovesEveryoneAndAnnouncesEachChange() throws Exception {
+        UUID acme = createDrive("Acme", "7.0", null);
+        String ashaApp = applyAndGetId(acme);
+        when(profileClient.fetch(anyString())).thenReturn(new StudentProfile(
+                raviId, "ravi@example.com", "Ravi", "STUDENT", new BigDecimal("8.0"), "MCA", "2027", true));
+        MvcResult r = apply(raviToken, acme).andExpect(status().isCreated()).andReturn();
+        String raviApp = JsonPath.read(r.getResponse().getContentAsString(), "$.id");
+        // Ravi is already shortlisted, so he must not be announced again
+        patchJson("/api/applications/" + raviApp + "/stage", tprToken, "{\"stage\":\"SHORTLISTED\"}").andExpect(status().isOk());
+        org.mockito.Mockito.clearInvocations(events);
+
+        patchJson("/api/applications/stage", tprToken,
+                "{\"ids\":[\"" + ashaApp + "\",\"" + raviApp + "\",\"" + UUID.randomUUID() + "\"],\"stage\":\"SHORTLISTED\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].stage").value("SHORTLISTED"));
+
+        verify(events, org.mockito.Mockito.times(1)).publish(eq(ashaApp), eq(DriveEvents.STAGE_CHANGED), any());
+        mvc.perform(get("/api/applications/mine").header("Authorization", bearer(ashaToken)))
+                .andExpect(jsonPath("$[0].stage").value("SHORTLISTED"));
+    }
+
+    @Test
+    void bulkStageNeedsIdsAndATpr() throws Exception {
+        patchJson("/api/applications/stage", tprToken, "{\"ids\":[],\"stage\":\"OFFER\"}").andExpect(status().isBadRequest());
+        patchJson("/api/applications/stage", ashaToken, "{\"ids\":[\"" + UUID.randomUUID() + "\"],\"stage\":\"OFFER\"}")
+                .andExpect(status().isForbidden());
     }
 }

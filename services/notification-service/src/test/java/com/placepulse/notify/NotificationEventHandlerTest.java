@@ -5,6 +5,7 @@ import com.placepulse.notify.domain.Notification;
 import com.placepulse.notify.events.InvalidEventException;
 import com.placepulse.notify.events.NotificationEventHandler;
 import com.placepulse.notify.repository.KnownStudentRepository;
+import com.placepulse.notify.repository.KnownTprRepository;
 import com.placepulse.notify.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class NotificationEventHandlerTest {
     @Autowired NotificationEventHandler handler;
     @Autowired NotificationRepository notifications;
     @Autowired KnownStudentRepository students;
+    @Autowired KnownTprRepository tprs;
 
     private final UUID asha = UUID.randomUUID();
     private final UUID ravi = UUID.randomUUID();
@@ -39,6 +41,7 @@ class NotificationEventHandlerTest {
     void clean() {
         notifications.deleteAll();
         students.deleteAll();
+        tprs.deleteAll();
     }
 
     private static String event(UUID eventId, String type, String payload) {
@@ -236,5 +239,67 @@ class NotificationEventHandlerTest {
         assertThat(forAsha.get(0).getTitle()).isEqualTo("Your Acme application was removed");
         assertThat(forAsha.get(0).getBody()).contains("apply again");
         assertThat(notifications.count()).isEqualTo(1);
+    }
+
+    @Test
+    void debarringTellsTheStudentWhatHappened() {
+        handler.handle(event(UUID.randomUUID(), "application.stage-changed", stageChanged(asha, "INTERVIEW", "DEBARRED")));
+
+        Notification n = notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(asha).get(0);
+        assertThat(n.getTitle()).isEqualTo("You were debarred from Kickdrum");
+        assertThat(n.getBody()).contains("edited your profile").contains("reinstate");
+    }
+
+    @Test
+    void aStudentWhoRegisteredBecomesReachableWithoutANotification() {
+        UUID newcomer = UUID.randomUUID();
+        handler.handle(event(UUID.randomUUID(), "student.registered",
+                "{\"studentId\":\"" + newcomer + "\",\"studentName\":\"New Kid\",\"email\":\"n@example.com\"}"));
+
+        handler.handle(event(UUID.randomUUID(), "drive.created", driveCreated(null)));
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(newcomer)).hasSize(1);
+    }
+
+    @Test
+    void everyKnownTprHearsAboutANewApplication() {
+        UUID otherTpr = UUID.randomUUID();
+        directoryTprs(otherTpr);
+
+        handler.handle(event(UUID.randomUUID(), "application.submitted", applicationSubmitted(asha)));
+
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(tpr)).hasSize(1);
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(otherTpr)).hasSize(1);
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(asha)).isEmpty();
+    }
+
+    @Test
+    void debarringAlertsTheStudentAndEveryTpr() {
+        UUID otherTpr = UUID.randomUUID();
+        directoryTprs(otherTpr, tpr);
+
+        handler.handle(event(UUID.randomUUID(), "application.stage-changed", stageChanged(asha, "TEST", "DEBARRED")));
+
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(asha)).hasSize(1);
+        List<Notification> forTeam = notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(otherTpr);
+        assertThat(forTeam).hasSize(1);
+        assertThat(forTeam.get(0).getTitle()).isEqualTo("Asha Verma was debarred from Kickdrum");
+        assertThat(forTeam.get(0).getLink()).isEqualTo("/drives/" + driveId);
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(tpr)).hasSize(1);
+    }
+
+    @Test
+    void anOrdinaryStageChangeDoesNotBotherTheTeam() {
+        UUID otherTpr = UUID.randomUUID();
+        directoryTprs(otherTpr);
+
+        handler.handle(event(UUID.randomUUID(), "application.stage-changed", stageChanged(asha, "APPLIED", "SHORTLISTED")));
+
+        assertThat(notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(otherTpr)).isEmpty();
+    }
+
+    private void directoryTprs(UUID... ids) {
+        for (UUID id : ids) {
+            tprs.save(new com.placepulse.notify.domain.KnownTpr(id));
+        }
     }
 }

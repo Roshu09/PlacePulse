@@ -44,6 +44,12 @@ public final class DriveDtos {
     public record UpdateStageRequest(@NotNull Stage stage) {
     }
 
+    /** Moves many applications to one stage at once. */
+    public record BulkStageRequest(
+            @NotNull @Size(min = 1, max = 200, message = "Choose between 1 and 200 applications") List<UUID> ids,
+            @NotNull Stage stage) {
+    }
+
     /**
      * `applicantCount` is only filled in for TPRs and `applied` only for students; the other is null.
      */
@@ -82,12 +88,14 @@ public final class DriveDtos {
             UUID driveId,
             String company,
             String roleTitle,
+            UUID studentId,
             String studentName,
             String studentEmail,
             BigDecimal cgpa,
             String course,
             String batch,
             Stage stage,
+            Stage debarredFrom,
             Instant appliedAt,
             Instant updatedAt) {
 
@@ -95,8 +103,8 @@ public final class DriveDtos {
             return new ApplicationResponse(a.getId(), a.getDriveId(),
                     drive == null ? null : drive.getCompany(),
                     drive == null ? null : drive.getRoleTitle(),
-                    a.getStudentName(), a.getStudentEmail(), a.getCgpa(), a.getCourse(), a.getBatch(),
-                    a.getStage(), a.getAppliedAt(), a.getUpdatedAt());
+                    a.getStudentId(), a.getStudentName(), a.getStudentEmail(), a.getCgpa(), a.getCourse(), a.getBatch(),
+                    a.getStage(), a.getDebarredFrom(), a.getAppliedAt(), a.getUpdatedAt());
         }
     }
 }

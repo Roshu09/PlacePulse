@@ -27,19 +27,22 @@ public class NotificationService {
         this.hub = hub;
     }
 
-    public SseEmitter stream(AuthenticatedUser user) {
+    /** The bell loads on every page, so this is how someone first becomes reachable for fan-out notifications. */
+    private void learn(AuthenticatedUser user) {
         if (user.role() == Role.STUDENT) {
-            // a student with the app open is reachable for "new drive" even before the first list call
             directory.remember(user.id());
+        } else {
+            directory.rememberTpr(user.id());
         }
+    }
+
+    public SseEmitter stream(AuthenticatedUser user) {
+        learn(user);
         return hub.subscribe(user.id());
     }
 
     public NotificationsResponse list(AuthenticatedUser user) {
-        if (user.role() == Role.STUDENT) {
-            // the bell loads on every page, so this is how a student first becomes reachable for "new drive"
-            directory.remember(user.id());
-        }
+        learn(user);
         var items = notifications.findTop30ByRecipientIdOrderByCreatedAtDesc(user.id()).stream()
                 .map(NotificationResponse::of)
                 .toList();

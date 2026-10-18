@@ -1,0 +1,14 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pyjwt>=2.8
+pypdf>=5.0
+httpx>=0.27
+python-multipart>=0.0.9
+numpy>=1.26
+# local, free embeddings (ONNX, no PyTorch download)
+fastembed>=0.4
+# the LLM call (Groq)
+langchain-core>=0.3
+langchain-groq>=0.2

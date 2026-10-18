@@ -31,7 +31,7 @@ Each service owns its own database. Services communicate through the gateway (sy
 | auth-service | Spring Boot, Spring Security, PostgreSQL | Login, roles (STUDENT / TPR), profiles |
 | drive-service | Spring Boot, PostgreSQL, Kafka | Drives, eligibility rules, applications |
 | notification-service | Spring Boot, Kafka, PostgreSQL | In-app notifications built from events (new drive, new application, stage change) |
-| ai-service | Python, FastAPI, LangChain | RAG resume vs JD matcher |
+| ai-service | Python, FastAPI, LangChain, Groq, fastembed | RAG resume vs JD matcher |
 | frontend | React, Tailwind, shadcn/ui | Student and TPR dashboards |
 
 ## Why these choices
@@ -89,7 +89,9 @@ Uses the JWT issued by auth-service (same `JWT_SECRET`). When a student applies,
 | GET | `/api/drives/{id}/applications` | TPR | applicants with CGPA, course, batch |
 | GET | `/api/applications/mine` | student | own applications with stage |
 | DELETE | `/api/applications/{id}` | TPR | removes an application so the student can apply again. Publishes `application.removed` |
-| PATCH | `/api/applications/{id}/stage` | TPR | `APPLIED, SHORTLISTED, TEST, INTERVIEW, OFFER, REJECTED` |
+| PATCH | `/api/applications/{id}/stage` | TPR | `APPLIED, SHORTLISTED, TEST, INTERVIEW, OFFER, REJECTED, DEBARRED` (DEBARRED is set automatically when a registered student edits their profile; moving back reinstates) |
+| PATCH | `/api/applications/stage` | TPR | `{ids, stage}` moves many applications at once; only real changes are published |
+| GET | `/api/drives/{id}/applications.csv` | TPR | applicants as a CSV download |
 
 Auth-service also gained `PUT /api/users/me/profile` (`cgpa`, `course`, `batch`).
 
@@ -133,7 +135,7 @@ A student becomes reachable for "new drive" notifications the first time they op
 - [x] Week 2a: drive-service (drives, eligibility, apply flow, tests)
 - [x] Week 2b: drives UI (post a drive, apply, track applications, student profile)
 - [x] Week 3: Kafka events, notification-service, notification bell
-- [ ] Week 4: LangChain RAG matcher
+- [x] Week 4: resume matcher (PDF upload, local embeddings, retrieval, Groq analysis, TPR ranking)
 - [ ] Week 5: TPR analytics, Redis caching, tests
 - [ ] Week 6: deploy, CI/CD, k6 load test, demo video
 
@@ -147,3 +149,21 @@ A student becomes reachable for "new drive" notifications the first time they op
 | p95 latency before / after Redis | TBD |
 | Test count | TBD |
 | Resume-match agreement vs manual | TBD |
+
+## Resume matcher (ai-service, port 8084)
+
+A student uploads a text PDF. The service cuts it into sections, embeds each one **locally and for free** (fastembed, `BAAI/bge-small-en-v1.5`, downloaded once) and stores them in `ai_db`.
+For a drive, it embeds the job description, **retrieves** the six most relevant resume sections, and sends only those (about 1,500 tokens) with the job text to a **Groq** model through LangChain. The model returns a score, matched skills, missing skills and suggestions as JSON, which is validated before use.
+
+- Results are cached per (student, drive) and reused until the resume or the job text changes, so the free Groq quota is spent once per pair.
+- If Groq is unreachable, rate-limited or has no key, the match falls back to a text-similarity score and says so.
+- The TPR ranking uses the cheap similarity score (plus the AI score when the student already ran it), so ranking 75 applicants costs no Groq calls.
+- The resume text is untrusted: the prompt tells the model to ignore instructions inside it, and the reply must pass a strict JSON check.
+
+| Method | Path | Who | What |
+|---|---|---|---|
+| GET / POST / DELETE | `/api/resume` | student | resume info / upload PDF (max 2 MB) / delete |
+| POST | `/api/matches/drives/{id}` | student | match my resume to this drive |
+| GET | `/api/matches/drives/{id}/applicants` | TPR | applicants ranked by fit |
+
+Set the key with `./scripts/set-groq-key.sh` (free key from console.groq.com). `cd services/ai-service && ./run.sh` starts it on its own; `.venv/bin/python -m pytest` runs its tests (needs `pip install -r requirements-dev.txt`).

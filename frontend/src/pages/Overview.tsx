@@ -29,17 +29,21 @@ function StudentOverview() {
     <>
       <PageHeader title="Overview" subtitle="Your applications and the drives open to you." />
 
-      {user?.cgpa == null && (
+      {user && !user.placementRegistered && (
         <Panel className="mb-8 flex flex-wrap items-center justify-between gap-3 border-l-4 !border-l-signal">
           <div>
-            <p className="font-display text-lg font-semibold">Add your CGPA to start applying</p>
-            <p className="text-sm text-ink-soft">Drives check it automatically. It takes a minute.</p>
+            <p className="font-display text-lg font-semibold">Register for placements to start applying</p>
+            <p className="text-sm text-ink-soft">
+              {user.missingRequired.length > 0
+                ? `Complete your profile first: ${user.missingRequired.length} required field${user.missingRequired.length === 1 ? '' : 's'} left.`
+                : 'Your profile is complete. Confirm it to unlock applying.'}
+            </p>
           </div>
           <Link
             to="/profile"
             className="inline-flex h-10 items-center rounded-lg bg-signal px-4 text-sm font-semibold text-on-signal hover:bg-signal-strong"
           >
-            Complete profile
+            Open profile
           </Link>
         </Panel>
       )}
@@ -56,7 +60,9 @@ function StudentOverview() {
                   All applications ({apps.data?.length})
                 </Link>
               </div>
-              {latest.stage === 'REJECTED' ? (
+              {latest.stage === 'DEBARRED' ? (
+                <p className="text-sm text-ink-soft">On hold because you edited your profile. Your placement team can reinstate it.</p>
+              ) : latest.stage === 'REJECTED' ? (
                 <p className="text-sm text-ink-soft">Not selected for this one. Other drives may still be open.</p>
               ) : (
                 <StageTrack reached={stageReached(latest.stage)} />

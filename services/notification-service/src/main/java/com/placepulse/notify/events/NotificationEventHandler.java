@@ -42,6 +42,7 @@ public class NotificationEventHandler {
     static final String STAGE_CHANGED = "application.stage-changed";
     static final String DRIVE_UPDATED = "drive.updated";
     static final String APPLICATION_REMOVED = "application.removed";
+    static final String STUDENT_REGISTERED = "student.registered";
 
     private static final Map<String, String> STAGE_LABEL = Map.of(
             "APPLIED", "Applied",
@@ -49,7 +50,8 @@ public class NotificationEventHandler {
             "TEST", "Test",
             "INTERVIEW", "Interview",
             "OFFER", "Offer",
-            "REJECTED", "Not selected");
+            "REJECTED", "Not selected",
+            "DEBARRED", "Debarred");
 
     private final ObjectMapper mapper;
     private final NotificationRepository notifications;
@@ -76,6 +78,7 @@ public class NotificationEventHandler {
             case STAGE_CHANGED -> onStageChanged(eventId, payload);
             case DRIVE_UPDATED -> onDriveUpdated(eventId, payload);
             case APPLICATION_REMOVED -> onApplicationRemoved(eventId, payload);
+            case STUDENT_REGISTERED -> directory.remember(uuid(payload, "studentId"));
             // a newer drive-service may publish types this version does not know yet: skip, don't fail
             default -> log.debug("Ignoring event type {}", type);
         }
@@ -129,7 +132,10 @@ public class NotificationEventHandler {
         // an applicant is certainly a student, so this also teaches us about them
         directory.remember(uuid(p, "studentId"));
 
-        deliver(eventId, APPLICATION_SUBMITTED, List.of(uuid(p, "driveCreatedBy")),
+        // the TPR who posted the drive, and the rest of the team too
+        UUID owner = uuid(p, "driveCreatedBy");
+        directory.rememberTpr(owner);
+        deliver(eventId, APPLICATION_SUBMITTED, teamWith(owner),
                 "New application for " + text(p, "company"),
                 text(p, "studentName") + " applied for " + text(p, "roleTitle"),
                 "/drives/" + uuid(p, "driveId"));
@@ -147,14 +153,32 @@ public class NotificationEventHandler {
             case "INTERVIEW" -> "Interview round at " + company;
             case "OFFER" -> "Offer from " + company;
             case "REJECTED" -> "Update on your " + company + " application";
+            case "DEBARRED" -> "You were debarred from " + company;
             default -> "Your " + company + " application moved to " + label(to);
         };
-        String body = text(p, "roleTitle") + ": moved from " + label(text(p, "fromStage")) + " to " + label(to);
+        String body = "DEBARRED".equals(to)
+                ? text(p, "roleTitle") + ": you edited your profile, so this application is on hold. The placement team can reinstate it."
+                : text(p, "roleTitle") + ": moved from " + label(text(p, "fromStage")) + " to " + label(to);
 
         deliver(eventId, STAGE_CHANGED, List.of(studentId), title, body, "/applications");
+
+        if ("DEBARRED".equals(to)) {
+            // a debar is something the placement team may need to act on (reinstate), so every TPR hears about it
+            deliver(eventId, STAGE_CHANGED, directory.allTprIds(),
+                    text(p, "studentName") + " was debarred from " + company,
+                    text(p, "roleTitle") + ": they edited their profile. Reinstate them from the applicants page if that is fine.",
+                    "/drives/" + uuid(p, "driveId"));
+        }
     }
 
     // ---- helpers ---------------------------------------------------------------------------
+
+    /** Every known TPR, plus the given one even if this service has not met them yet. */
+    private List<UUID> teamWith(UUID owner) {
+        Set<UUID> team = new java.util.LinkedHashSet<>(directory.allTprIds());
+        team.add(owner);
+        return List.copyOf(team);
+    }
 
     private void deliver(UUID eventId, String type, Collection<UUID> recipients, String title, String body, String link) {
         if (recipients.isEmpty()) {

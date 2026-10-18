@@ -1,5 +1,5 @@
 import { forwardRef, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, TriangleAlert } from 'lucide-react'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
 
@@ -161,5 +161,56 @@ const tones: Record<Tone, string> = {
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>
+  )
+}
+
+/** A blocking "are you sure" box. Escape or clicking outside cancels. */
+export function ConfirmDialog({
+  title,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  loading = false,
+  onConfirm,
+  onCancel,
+  children,
+}: {
+  title: string
+  confirmLabel: string
+  cancelLabel?: string
+  loading?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+  children: ReactNode
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      onClick={onCancel}
+      onKeyDown={(e) => e.key === 'Escape' && onCancel()}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl ring-1 ring-line"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-signal/25">
+            <TriangleAlert className="size-5" aria-hidden="true" />
+          </span>
+          <h2 className="font-display text-xl font-semibold">{title}</h2>
+        </div>
+        <div className="space-y-2 text-sm text-ink-soft">{children}</div>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onCancel} disabled={loading} autoFocus>
+            {cancelLabel}
+          </Button>
+          <Button onClick={onConfirm} loading={loading}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

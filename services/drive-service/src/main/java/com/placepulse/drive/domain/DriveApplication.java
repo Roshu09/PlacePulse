@@ -55,6 +55,18 @@ public class DriveApplication {
     @Column(nullable = false, length = 20)
     private Stage stage = Stage.APPLIED;
 
+    // contact details as they were when the student applied (blank for applications made before these were stored)
+    @Column(length = 20)
+    private String phone;
+
+    @Column(length = 300)
+    private String resumeUrl;
+
+    /** The stage the application was in when the student was debarred, so reinstating can restore it. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Stage debarredFrom;
+
     @Column(nullable = false, updatable = false)
     private Instant appliedAt = Instant.now();
 
@@ -76,7 +88,17 @@ public class DriveApplication {
         this.batch = batch;
     }
 
+    public void attachContact(String phone, String resumeUrl) {
+        this.phone = phone;
+        this.resumeUrl = resumeUrl;
+    }
+
     public void moveTo(Stage stage) {
+        if (stage == Stage.DEBARRED && this.stage != Stage.DEBARRED) {
+            this.debarredFrom = this.stage;
+        } else if (stage != Stage.DEBARRED) {
+            this.debarredFrom = null;
+        }
         this.stage = stage;
         this.updatedAt = Instant.now();
     }
@@ -90,6 +112,9 @@ public class DriveApplication {
     public String getCourse() { return course; }
     public String getBatch() { return batch; }
     public Stage getStage() { return stage; }
+    public String getPhone() { return phone; }
+    public String getResumeUrl() { return resumeUrl; }
+    public Stage getDebarredFrom() { return debarredFrom; }
     public Instant getAppliedAt() { return appliedAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

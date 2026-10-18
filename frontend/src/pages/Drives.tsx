@@ -4,7 +4,7 @@ import { Briefcase, Check, Pencil, Plus } from 'lucide-react'
 import { DriveCard } from '../components/DriveCard'
 import { PageHeader, Panel } from '../components/Page'
 import { DriveForm } from '../components/DriveForm'
-import { ProfileForm } from '../components/ProfileForm'
+import { MatchPanel } from '../components/MatchPanel'
 import { Button, FormError } from '../components/ui'
 import { ApiError, api, type Drive, type DriveStatus } from '../lib/api'
 import { getToken, useAuth } from '../lib/auth'
@@ -48,7 +48,7 @@ function StudentDrives() {
   const [applying, setApplying] = useState<string | null>(null)
   const [applyErrors, setApplyErrors] = useState<Record<string, string>>({})
 
-  const needsProfile = user?.cgpa == null
+  const needsProfile = !user?.placementRegistered
 
   async function apply(drive: Drive) {
     setApplying(drive.id)
@@ -72,9 +72,16 @@ function StudentDrives() {
 
       {needsProfile && (
         <Panel className="mb-6 border-l-4 !border-l-signal">
-          <p className="font-display text-lg font-semibold">Add your CGPA to apply</p>
-          <p className="mb-4 mt-1 text-sm text-ink-soft">Drives have a minimum CGPA. You only need to enter this once.</p>
-          <ProfileForm />
+          <p className="font-display text-lg font-semibold">Register for placements to apply</p>
+          <p className="mb-4 mt-1 text-sm text-ink-soft">
+            Complete your profile and confirm it once. After that you can apply to every drive you are eligible for.
+          </p>
+          <Link
+            to="/profile"
+            className="inline-flex h-10 items-center rounded-lg bg-signal px-4 text-sm font-semibold text-on-signal hover:bg-signal-strong"
+          >
+            Open profile
+          </Link>
         </Panel>
       )}
 
@@ -129,6 +136,7 @@ function StudentDrives() {
                     )
                   }
                 />
+                <MatchPanel driveId={drive.id} />
               </li>
             )
           })}

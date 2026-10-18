@@ -1,15 +1,28 @@
 import { useCallback, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Download, Sparkles, Trash2 } from 'lucide-react'
 import { DriveMeta, Requirement } from '../components/DriveCard'
 import { PageHeader, Panel } from '../components/Page'
-import { Button, FormError, Select } from '../components/ui'
-import { ApiError, api, type Application, type Stage } from '../lib/api'
+import { Badge, Button, FormError, Select } from '../components/ui'
+import { ApiError, api, type Application, type RankedApplicant, type Stage } from '../lib/api'
 import { getToken } from '../lib/auth'
 import { STAGE_LABEL } from '../lib/format'
 import { useLoad } from '../lib/useLoad'
 
-const ALL_STAGES: Stage[] = ['APPLIED', 'SHORTLISTED', 'TEST', 'INTERVIEW', 'OFFER', 'REJECTED']
+function FitBadge({ row }: { row?: RankedApplicant }) {
+  if (!row || row.score == null) {
+    return <span className="ml-2 text-xs font-normal text-ink-soft">no resume</span>
+  }
+  return (
+    <span className="ml-2">
+      <Badge tone={row.score >= 70 ? 'good' : row.score >= 40 ? 'signal' : 'bad'}>
+        {row.score}% fit{row.aiScore == null ? ' (text match)' : ''}
+      </Badge>
+    </span>
+  )
+}
+
+const ALL_STAGES: Stage[] = ['APPLIED', 'SHORTLISTED', 'TEST', 'INTERVIEW', 'OFFER', 'REJECTED', 'DEBARRED']
 
 export default function DriveApplicants() {
   const { id = '' } = useParams()
@@ -21,6 +34,62 @@ export default function DriveApplicants() {
   const [actionError, setActionError] = useState('')
   const [filter, setFilter] = useState<Stage | 'ALL'>('ALL')
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkStageTo, setBulkStageTo] = useState<Stage>('SHORTLISTED')
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [fit, setFit] = useState<Map<string, RankedApplicant> | null>(null)
+  const [ranking, setRanking] = useState(false)
+
+  async function rankByFit() {
+    setRanking(true)
+    setActionError('')
+    try {
+      const rows = await api.rankApplicants(getToken(), id)
+      setFit(new Map(rows.map((r) => [r.studentId, r])))
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      setRanking(false)
+    }
+  }
+
+  function toggle(appId: string) {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(appId)) next.delete(appId)
+      else next.add(appId)
+      return next
+    })
+  }
+
+  async function moveSelected(ids: string[]) {
+    setBulkBusy(true)
+    setActionError('')
+    try {
+      const updated = await api.bulkSetStage(getToken(), ids, bulkStageTo)
+      const byId = new Map(updated.map((a) => [a.id, a]))
+      applicants.setData((rows) => rows.map((a) => byId.get(a.id) ?? a))
+      setSelected(new Set())
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  async function exportCsv() {
+    setExporting(true)
+    setActionError('')
+    try {
+      const name = `${drive.data?.company ?? 'drive'}-${drive.data?.roleTitle ?? ''}-applicants.csv`.replace(/[^A-Za-z0-9.]+/g, '-')
+      await api.downloadApplicantsCsv(getToken(), id, name)
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function changeStage(app: Application, stage: Stage) {
     if (stage === app.stage) return
@@ -52,7 +121,13 @@ export default function DriveApplicants() {
   }
 
   const list = applicants.data ?? []
-  const shown = filter === 'ALL' ? list : list.filter((a) => a.stage === filter)
+  const filtered = filter === 'ALL' ? list : list.filter((a) => a.stage === filter)
+  // once ranked, best fit first; people without a resume go last
+  const shown = fit
+    ? [...filtered].sort((a, b) => (fit.get(b.studentId)?.score ?? -1) - (fit.get(a.studentId)?.score ?? -1))
+    : filtered
+  const selectedIds = list.filter((a) => selected.has(a.id)).map((a) => a.id)
+  const allShownSelected = shown.length > 0 && shown.every((a) => selected.has(a.id))
   const counts = ALL_STAGES.map((s) => [s, list.filter((a) => a.stage === s).length] as const).filter(([, n]) => n > 0)
 
   return (
@@ -78,6 +153,13 @@ export default function DriveApplicants() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <h2 className="font-display text-lg font-semibold">Applicants{applicants.data ? ` (${list.length})` : ''}</h2>
         {list.length > 0 && (
+          <div className="flex items-end gap-3">
+            <Button variant="secondary" className="h-11" loading={ranking} onClick={rankByFit}>
+              <Sparkles className="size-4" aria-hidden="true" /> {fit ? 'Refresh fit' : 'Rank by fit'}
+            </Button>
+            <Button variant="secondary" className="h-11" loading={exporting} onClick={exportCsv}>
+              <Download className="size-4" aria-hidden="true" /> Export CSV
+            </Button>
           <Select
             aria-label="Filter by stage"
             value={filter}
@@ -91,8 +173,28 @@ export default function DriveApplicants() {
               </option>
             ))}
           </Select>
+          </div>
         )}
       </div>
+
+      {selectedIds.length > 0 && (
+        <div role="region" aria-label="Bulk actions" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-sunken p-3 ring-1 ring-line">
+          <span className="text-sm font-medium">{selectedIds.length} selected</span>
+          <Select aria-label="Move selected to stage" value={bulkStageTo} onChange={(e) => setBulkStageTo(e.target.value as Stage)} className="w-44">
+            {ALL_STAGES.filter((s) => s !== 'DEBARRED').map((s) => (
+              <option key={s} value={s}>
+                {STAGE_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+          <Button className="h-10 text-sm" loading={bulkBusy} onClick={() => moveSelected(selectedIds)}>
+            Move selected
+          </Button>
+          <Button variant="ghost" className="h-10 text-sm" onClick={() => setSelected(new Set())}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {actionError && (
         <div className="mb-4">
@@ -118,17 +220,47 @@ export default function DriveApplicants() {
         </Panel>
       ) : (
         <Panel className="!p-0">
+          <label className="flex items-center gap-3 border-b border-line px-4 py-2.5 text-sm text-ink-soft md:px-6">
+            <input
+              type="checkbox"
+              checked={allShownSelected}
+              onChange={() => setSelected(allShownSelected ? new Set() : new Set(shown.map((a) => a.id)))}
+              className="size-4"
+            />
+            Select all{filter === 'ALL' ? '' : ` ${STAGE_LABEL[filter as Stage].toLowerCase()}`} ({shown.length})
+          </label>
           <ul className="divide-y divide-line">
             {shown.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-4 p-4 md:px-6">
-                <div className="min-w-0">
-                  <p className="font-medium">{a.studentName}</p>
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${a.studentName}`}
+                  checked={selected.has(a.id)}
+                  onChange={() => toggle(a.id)}
+                  className="size-4 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">
+                    {a.studentName}
+                    {fit && <FitBadge row={fit.get(a.studentId)} />}
+                  </p>
                   <p className="truncate text-sm text-ink-soft">{a.studentEmail}</p>
                   <p className="mt-1 text-sm text-ink-soft">
                     {[a.cgpa != null ? `CGPA ${a.cgpa.toFixed(2)}` : null, a.course, a.batch].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {a.stage === 'DEBARRED' && (
+                    <Button
+                      variant="secondary"
+                      className="h-10 text-sm"
+                      loading={busy === a.id}
+                      onClick={() => changeStage(a, a.debarredFrom ?? 'APPLIED')}
+                      title="Put this application back where it was before the student edited their profile"
+                    >
+                      Reinstate
+                    </Button>
+                  )}
                   <Select
                     aria-label={`Move ${a.studentName} to stage`}
                     value={a.stage}

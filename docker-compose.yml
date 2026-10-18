@@ -52,12 +52,15 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       TPR_INVITE_CODE: ${TPR_INVITE_CODE:-}
+      KAFKA_BROKERS: redpanda:29092
       JAVA_TOOL_OPTIONS: -Xmx256m
     ports:
       - "8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
+      redpanda:
+        condition: service_started
 
   drive-service:
     build: ./services/drive-service
@@ -96,5 +99,25 @@ services:
       redpanda:
         condition: service_started
 
+  ai-service:
+    build: ./services/ai-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      DRIVE_SERVICE_URL: http://drive-service:8082
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+    ports:
+      - "8084:8084"
+    volumes:
+      - embedmodels:/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
+  embedmodels:
   pgdata:

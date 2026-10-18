@@ -21,6 +21,8 @@ public interface DriveApplicationRepository extends JpaRepository<DriveApplicati
 
     List<DriveApplication> findAllByStudentId(UUID studentId);
 
+    List<DriveApplication> findAllByStudentIdAndStageIn(UUID studentId, Collection<com.placepulse.drive.domain.Stage> stages);
+
     List<DriveApplication> findAllByStudentIdOrderByAppliedAtDesc(UUID studentId);
 
     List<DriveApplication> findAllByDriveIdOrderByAppliedAtDesc(UUID driveId);

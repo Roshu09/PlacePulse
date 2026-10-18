@@ -8,6 +8,17 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/auth_db}
     username: ${DB_USER:placepulse}
     password: ${DB_PASSWORD:change_me}
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        # if the broker is down, give up quickly instead of hanging a user request
+        max.block.ms: 2000
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 6000
   jpa:
     hibernate:
       ddl-auto: update
@@ -20,6 +31,9 @@ management:
         include: health,info
 
 app:
+  events:
+    enabled: ${EVENTS_ENABLED:true}
+    topic: placepulse.events
   jwt:
     # must be at least 32 characters (HS256)
     secret: ${JWT_SECRET:dev_only_secret_change_me_dev_only_secret}

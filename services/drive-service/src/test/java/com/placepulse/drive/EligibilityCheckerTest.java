@@ -23,7 +23,7 @@ class EligibilityCheckerTest {
 
     private StudentProfile profile(String cgpa, String batch) {
         return new StudentProfile(UUID.randomUUID(), "asha@example.com", "Asha Verma", "STUDENT",
-                cgpa == null ? null : new BigDecimal(cgpa), "MCA", batch);
+                cgpa == null ? null : new BigDecimal(cgpa), "MCA", batch, true);
     }
 
     @Test
@@ -91,5 +91,16 @@ class EligibilityCheckerTest {
         assertThat(EligibilityChecker.passOutYear("2025\u201327")).isEqualTo(2027);
         assertThat(EligibilityChecker.passOutYear("last batch")).isNull();
         assertThat(EligibilityChecker.passOutYear(null)).isNull();
+    }
+
+    @Test
+    void unregisteredStudentMustRegisterFirst() {
+        StudentProfile unregistered = new StudentProfile(UUID.randomUUID(), "a@example.com", "Asha", "STUDENT",
+                new BigDecimal("9.0"), "MCA", "2027", false);
+        assertThat(EligibilityChecker.check(drive("7.0"), unregistered)).hasValueSatisfying(
+                reason -> assertThat(reason).contains("Register for placements"));
+        StudentProfile unknown = new StudentProfile(UUID.randomUUID(), "a@example.com", "Asha", "STUDENT",
+                new BigDecimal("9.0"), "MCA", "2027", null);
+        assertThat(EligibilityChecker.check(drive("7.0"), unknown)).isPresent();
     }
 }

@@ -7,6 +7,7 @@ import com.placepulse.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +34,11 @@ public class UserController {
     public UserResponse updateProfile(@AuthenticationPrincipal AuthenticatedUser principal,
                                       @Valid @RequestBody UpdateProfileRequest request) {
         return authService.updateProfile(principal.id(), request);
+    }
+
+    @PostMapping("/users/me/placement-registration")
+    public UserResponse registerForPlacements(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return authService.registerForPlacements(principal.id());
     }
 
     /** Placeholder TPR-only endpoint, proves role-based access works. Real TPR APIs come later. */

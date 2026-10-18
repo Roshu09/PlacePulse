@@ -30,9 +30,10 @@ export const STAGE_LABEL: Record<Stage, string> = {
   INTERVIEW: 'Interview',
   OFFER: 'Offer',
   REJECTED: 'Not selected',
+  DEBARRED: 'Debarred',
 }
 
-/** Stages in order, as the track shows them. REJECTED is a dead end and has no position. */
+/** Stages in order, as the track shows them. REJECTED and DEBARRED are dead ends and have no position. */
 export const STAGE_ORDER: Stage[] = ['APPLIED', 'SHORTLISTED', 'TEST', 'INTERVIEW', 'OFFER']
 
 export function stageReached(stage: Stage): number {

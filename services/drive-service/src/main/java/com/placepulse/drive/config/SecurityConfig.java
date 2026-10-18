@@ -43,6 +43,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/applications/*").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/drives/*/status").hasRole("TPR")
                         .requestMatchers(HttpMethod.GET, "/api/drives/*/applications").hasRole("TPR")
+                        .requestMatchers(HttpMethod.GET, "/api/drives/*/applications.csv").hasRole("TPR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/applications/stage").hasRole("TPR")
                         .requestMatchers(HttpMethod.PATCH, "/api/applications/*/stage").hasRole("TPR")
                         // students only
                         .requestMatchers(HttpMethod.POST, "/api/drives/*/apply").hasRole("STUDENT")

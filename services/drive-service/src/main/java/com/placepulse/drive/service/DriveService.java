@@ -235,6 +235,7 @@ public class DriveService {
         DriveApplication application = new DriveApplication(
                 driveId, student.id(), profile.fullName(), profile.email(),
                 profile.cgpa(), profile.course(), profile.batch());
+        application.attachContact(profile.phone(), profile.resumeUrl());
         try {
             application = applications.saveAndFlush(application);
         } catch (DataIntegrityViolationException e) {
@@ -296,6 +297,95 @@ public class DriveService {
                     saved.getStudentId(), saved.getStudentName(), from.name(), stage.name()));
         }
         return ApplicationResponse.of(saved, drive);
+    }
+
+    /** Rounds in which an application is still alive. Offers and rejections are final, so editing a profile leaves them be. */
+    private static final Set<Stage> DEBARRABLE = Set.of(Stage.APPLIED, Stage.SHORTLISTED, Stage.TEST, Stage.INTERVIEW);
+
+    /**
+     * The student edited their registered profile, so every application still in progress is marked DEBARRED. The
+     * placement team can reinstate one by moving it back. Safe to run twice for the same event: debarred
+     * applications are no longer in DEBARRABLE.
+     */
+    public int debarStudent(UUID studentId) {
+        record Debarred(DriveApplication application, Drive drive, Stage from) {
+        }
+        List<Debarred> done = tx.execute(status -> {
+            List<Debarred> moved = new ArrayList<>();
+            for (DriveApplication application : applications.findAllByStudentIdAndStageIn(studentId, DEBARRABLE)) {
+                Stage from = application.getStage();
+                application.moveTo(Stage.DEBARRED);
+                applications.save(application);
+                moved.add(new Debarred(application, drives.findById(application.getDriveId()).orElse(null), from));
+            }
+            return moved;
+        });
+        for (Debarred d : done) {
+            if (d.drive() != null) {
+                DriveApplication a = d.application();
+                emit(a.getId().toString(), DriveEvents.STAGE_CHANGED, new DriveEvents.StageChanged(
+                        a.getId(), d.drive().getId(), d.drive().getCompany(), d.drive().getRoleTitle(),
+                        a.getStudentId(), a.getStudentName(), d.from().name(), Stage.DEBARRED.name()));
+            }
+        }
+        return done.size();
+    }
+
+    /**
+     * Moves each of the applications to {@code stage} in one transaction, then announces every real change.
+     * Ids that do not exist are skipped; applications already at that stage are left alone and not announced.
+     */
+    public List<ApplicationResponse> bulkUpdateStage(Collection<UUID> ids, Stage stage) {
+        record Moved(DriveApplication application, Stage from) {
+        }
+        List<Moved> moved = tx.execute(status -> {
+            List<Moved> changed = new ArrayList<>();
+            for (DriveApplication application : applications.findAllById(new java.util.LinkedHashSet<>(ids))) {
+                Stage from = application.getStage();
+                if (from == stage) {
+                    continue;
+                }
+                application.moveTo(stage);
+                applications.save(application);
+                changed.add(new Moved(application, from));
+            }
+            return changed;
+        });
+        Map<UUID, Drive> byId = drivesById(moved.stream().map(m -> m.application().getDriveId()).distinct().toList());
+        List<ApplicationResponse> result = new ArrayList<>();
+        for (Moved m : moved) {
+            DriveApplication a = m.application();
+            Drive drive = byId.get(a.getDriveId());
+            if (drive != null) {
+                emit(a.getId().toString(), DriveEvents.STAGE_CHANGED, new DriveEvents.StageChanged(
+                        a.getId(), drive.getId(), drive.getCompany(), drive.getRoleTitle(),
+                        a.getStudentId(), a.getStudentName(), m.from().name(), stage.name()));
+            }
+            result.add(ApplicationResponse.of(a, drive));
+        }
+        return result;
+    }
+
+    /** The applicants of a drive as a spreadsheet-friendly CSV (UTF-8 with a BOM so Excel reads it correctly). */
+    public String applicantsCsv(UUID driveId) {
+        findDrive(driveId);
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"Name", "Email", "Phone", "CGPA", "Course", "Batch", "Resume", "Stage", "Applied on"});
+        for (DriveApplication a : applications.findAllByDriveIdOrderByAppliedAtDesc(driveId)) {
+            rows.add(new String[]{
+                    a.getStudentName(), a.getStudentEmail(), a.getPhone(),
+                    a.getCgpa() == null ? "" : a.getCgpa().toPlainString(),
+                    a.getCourse(), a.getBatch(), a.getResumeUrl(), a.getStage().name(),
+                    a.getAppliedAt().atZone(java.time.ZoneId.of("Asia/Kolkata")).toLocalDate().toString()});
+        }
+        return Csv.write(rows);
+    }
+
+    /** A safe file name for the download, like "Acme-SDE-Intern-applicants.csv". */
+    public String applicantsCsvName(UUID driveId) {
+        Drive d = findDrive(driveId);
+        String base = (d.getCompany() + "-" + d.getRoleTitle()).replaceAll("[^A-Za-z0-9]+", "-").replaceAll("^-|-$", "");
+        return (base.isEmpty() ? "drive" : base) + "-applicants.csv";
     }
 
     // ---- helpers --------------------------------------------------------------------------
