@@ -11,7 +11,7 @@ I built it because I am the placement representative (TPR) for a 75-student MCA 
 
 <p>
   <img src="docs/screenshots/drives.png" width="49%" alt="Drives list" />
-  <img src="docs/screenshots/applicants.png" width="49%" alt="Applicants with AI fit ranking" />
+  <img src="docs/screenshots/applicants.png" width="49%" alt="A drive's applicants with stage controls, bulk actions and CSV export" />
 </p>
 
 ## What it does

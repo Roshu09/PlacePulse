@@ -40,6 +40,7 @@ export default function DriveApplicants() {
   const [exporting, setExporting] = useState(false)
   const [fit, setFit] = useState<Map<string, RankedApplicant> | null>(null)
   const [ranking, setRanking] = useState(false)
+  const [rankNote, setRankNote] = useState('')
 
   async function rankByFit() {
     setRanking(true)
@@ -47,6 +48,12 @@ export default function DriveApplicants() {
     try {
       const rows = await api.rankApplicants(getToken(), id)
       setFit(new Map(rows.map((r) => [r.studentId, r])))
+      const withResume = rows.filter((r) => r.hasResume).length
+      setRankNote(
+        withResume === 0
+          ? `None of the ${rows.length} applicants has uploaded a resume yet, so there is nothing to rank.`
+          : `${withResume} of ${rows.length} applicants have a resume. The rest are listed last.`,
+      )
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.')
     } finally {
@@ -200,6 +207,12 @@ export default function DriveApplicants() {
         <div className="mb-4">
           <FormError>{actionError}</FormError>
         </div>
+      )}
+
+      {rankNote && (
+        <p role="status" className="mb-4 rounded-lg bg-sunken px-4 py-3 text-sm text-ink-soft ring-1 ring-line">
+          {rankNote}
+        </p>
       )}
 
       {applicants.loading && !applicants.data ? (
