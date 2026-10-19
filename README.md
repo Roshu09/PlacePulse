@@ -2,6 +2,8 @@
 
 AI-powered campus placement platform built as event-driven microservices.
 
+[![CI](https://github.com/Roshu09/PlacePulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Roshu09/PlacePulse/actions/workflows/ci.yml)
+
 > Status: scaffolding (Week 0). Replace the placeholders below with real numbers as you measure them.
 
 ## Architecture
