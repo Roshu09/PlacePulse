@@ -93,6 +93,18 @@ TPR_EMAIL=you@example.com TPR_PASSWORD=... ./scripts/bench-analytics.sh 200
 
 `./scripts/seed-demo.sh` loads a small realistic season (8 fictional companies, 75 students) for screenshots.
 
+## Load test
+
+`loadtest/k6-mixed.js` simulates a placement season: students register, complete a profile, apply to every drive (database write, Kafka event, cache invalidation, notification) and then keep browsing, while two TPR users keep reading analytics and applicant lists. It fails the run if more than 1% of requests fail, if read p95 goes above 500 ms or apply p95 goes above 1 s. After the run it checks that every application and every Kafka-driven notification arrived.
+
+```bash
+SMOKE=1 TPR_EMAIL=you@example.com TPR_PASSWORD=... ./scripts/loadtest.sh   # tiny run first
+TPR_EMAIL=you@example.com TPR_PASSWORD=... ./scripts/loadtest.sh           # 50 students, 10 drives
+./scripts/clean-loadtest.sh                                                # remove what it created
+```
+
+k6 runs through Docker, so nothing needs installing.
+
 ## Run it locally
 
 Needs Docker, Java 21 (not 25), Node 22 and Python 3.12.
